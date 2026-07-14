@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/BrandonDucar/toolgym/main/schemas/workout-receipt-v0.1.schema.json",
+  "title": "ToolGym Workout Receipt v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "id", "subject", "exercise", "evaluator", "result", "evidenceHash", "issuedAt"],
+  "properties": {
+    "schema": { "const": "toolgym.workout-receipt.v0.1" },
+    "id": { "type": "string", "format": "uuid" },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name"],
+      "properties": { "id": { "type": "string" }, "name": { "type": "string" } }
+    },
+    "exercise": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version"],
+      "properties": { "id": { "type": "string" }, "version": { "type": "string" } }
+    },
+    "evaluator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version"],
+      "properties": { "id": { "type": "string" }, "version": { "type": "string" } }
+    },
+    "result": {
+      "type": "object",
+      "required": ["score", "passed", "criteria"],
+      "properties": {
+        "score": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "passed": { "type": "boolean" },
+        "criteria": { "type": "array", "items": { "type": "object" } }
+      }
+    },
+    "evidenceHash": { "type": "string", "minLength": 40 },
+    "issuedAt": { "type": "string", "format": "date-time" }
+  }
+}

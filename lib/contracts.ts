@@ -28,6 +28,28 @@ export interface ExerciseDefinition {
   criteria: Array<{ id: string; label: string; critical?: boolean }>;
 }
 
+export interface LabAnswer {
+  taskId: string;
+  decision: string;
+  action: string;
+  reasonCode: string;
+  evidence: string;
+}
+
+export interface LabDefinition {
+  id: string;
+  version: string;
+  title: string;
+  summary: string;
+  difficulty: 1 | 2 | 3;
+  estimatedMinutes: number;
+  passScore: number;
+  packet: Record<string, unknown>;
+  responseShape: Record<string, unknown>;
+  expectedAnswers: LabAnswer[];
+  criteria: Array<{ id: string; label: string; critical?: boolean }>;
+}
+
 export interface WorkspaceRecord {
   id: string;
   name: string;
@@ -51,6 +73,20 @@ export interface AttemptRecord {
   agent_id: string;
   exercise_id: string;
   exercise_version: string;
+  response_json: string;
+  criteria_json: string;
+  score: number;
+  passed: number;
+  evidence_hash: string;
+  created_at: string;
+}
+
+export interface LabAttemptRecord {
+  id: string;
+  workspace_id: string;
+  agent_id: string;
+  lab_id: string;
+  lab_version: string;
   response_json: string;
   criteria_json: string;
   score: number;

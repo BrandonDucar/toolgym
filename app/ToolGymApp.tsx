@@ -13,6 +13,7 @@ import {
   Dumbbell,
   ExternalLink,
   FileCheck2,
+  FlaskConical,
   KeyRound,
   LockKeyhole,
   LogOut,
@@ -35,6 +36,18 @@ type Exercise = {
   responseShape: Record<string, unknown>;
 };
 
+type SimulationLab = {
+  id: string;
+  version: string;
+  title: string;
+  summary: string;
+  difficulty: number;
+  estimatedMinutes: number;
+  passScore: number;
+  packet: Record<string, unknown>;
+  responseShape: Record<string, unknown>;
+};
+
 type Dashboard = {
   workspace: { id: string; name: string };
   agents: Array<{
@@ -46,6 +59,7 @@ type Dashboard = {
   }>;
   attempts: Array<{
     id: string;
+    agent_id: string;
     exercise_id: string;
     exercise_version: string;
     score: number;
@@ -53,8 +67,19 @@ type Dashboard = {
     evidence_hash: string;
     created_at: string;
   }>;
+  labAttempts: Array<{
+    id: string;
+    agent_id: string;
+    lab_id: string;
+    lab_version: string;
+    score: number;
+    passed: boolean;
+    evidence_hash: string;
+    created_at: string;
+  }>;
   fieldExams: Array<{
     id: string;
+    agent_id: string;
     task_summary: string;
     evidence_url: string;
     status: string;
@@ -63,10 +88,18 @@ type Dashboard = {
   }>;
   credentials: Array<{
     id: string;
+    agent_id: string;
     status: string;
     payload_hash: string;
     issued_at: string;
     expires_at: string;
+  }>;
+  qualifications: Record<string, {
+    passedExerciseIds: string[];
+    passedLabIds: string[];
+    coreQualified: boolean;
+    simulationQualified: boolean;
+    fieldEligible: boolean;
   }>;
   qualification: { passedExerciseIds: string[]; qualified: boolean };
 };
@@ -88,8 +121,12 @@ export default function ToolGymApp() {
   const [apiKey, setApiKey] = useState("");
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
   const [exercises, setExercises] = useState<Exercise[]>([]);
+  const [labs, setLabs] = useState<SimulationLab[]>([]);
   const [selectedId, setSelectedId] = useState("tool-selection");
+  const [selectedLabId, setSelectedLabId] = useState("");
+  const [selectedAgentId, setSelectedAgentId] = useState("");
   const [submission, setSubmission] = useState("");
+  const [labSubmission, setLabSubmission] = useState("");
   const [notice, setNotice] = useState<{ tone: "good" | "bad" | "info"; message: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [reviewUrl, setReviewUrl] = useState("");
@@ -139,6 +176,19 @@ export default function ToolGymApp() {
       } catch {
         if (active) setNotice({ tone: "bad", message: "The workout catalog is unavailable." });
       }
+      try {
+        const response = await fetch("/api/labs");
+        if (!response.ok) throw new Error("Lab catalog request failed");
+        const data = (await response.json()) as { labs: SimulationLab[] };
+        if (!active) return;
+        setLabs(data.labs);
+        if (data.labs[0]) {
+          setSelectedLabId(data.labs[0].id);
+          setLabSubmission(pretty(data.labs[0].responseShape));
+        }
+      } catch {
+        if (active) setNotice({ tone: "bad", message: "The simulation lab catalog is unavailable." });
+      }
     }
 
     void loadCatalog();
@@ -175,18 +225,41 @@ export default function ToolGymApp() {
   }, [apiKey, authFetch]);
 
   const selected = useMemo(() => exercises.find((exercise) => exercise.id === selectedId) ?? exercises[0], [exercises, selectedId]);
-  const currentAgent = dashboard?.agents[0];
+  const selectedLab = useMemo(() => labs.find((lab) => lab.id === selectedLabId) ?? labs[0], [labs, selectedLabId]);
+  const currentAgent = dashboard?.agents.find((agent) => agent.id === selectedAgentId) ?? dashboard?.agents[0];
+  const currentQualification = currentAgent ? dashboard?.qualifications[currentAgent.id] : undefined;
   const selectedAdapter = ADAPTERS.find((adapter) => adapter.id === setup.adapterType) ?? DEFAULT_ADAPTER;
   const selectedTarget = TOOL_TARGETS.find((target) => target.id === setup.toolTargetId) ?? DEFAULT_TOOL_TARGET;
+  const candidateAttempts = useMemo(
+    () => (dashboard?.attempts ?? []).filter((attempt) => attempt.agent_id === currentAgent?.id),
+    [dashboard, currentAgent?.id],
+  );
+  const candidateLabAttempts = useMemo(
+    () => (dashboard?.labAttempts ?? []).filter((attempt) => attempt.agent_id === currentAgent?.id),
+    [dashboard, currentAgent?.id],
+  );
+  const candidateFieldExams = useMemo(
+    () => (dashboard?.fieldExams ?? []).filter((exam) => exam.agent_id === currentAgent?.id),
+    [dashboard, currentAgent?.id],
+  );
+  const candidateCredentials = useMemo(
+    () => (dashboard?.credentials ?? []).filter((credential) => credential.agent_id === currentAgent?.id),
+    [dashboard, currentAgent?.id],
+  );
   const latestAttempts = useMemo(() => {
     const map = new Map<string, Dashboard["attempts"][number]>();
-    for (const attempt of dashboard?.attempts ?? []) if (!map.has(attempt.exercise_id)) map.set(attempt.exercise_id, attempt);
+    for (const attempt of candidateAttempts) if (!map.has(attempt.exercise_id)) map.set(attempt.exercise_id, attempt);
     return map;
-  }, [dashboard]);
+  }, [candidateAttempts]);
 
   function selectExercise(exercise: Exercise) {
     setSelectedId(exercise.id);
     setSubmission(pretty(exercise.responseShape));
+  }
+
+  function selectLab(lab: SimulationLab) {
+    setSelectedLabId(lab.id);
+    setLabSubmission(pretty(lab.responseShape));
   }
 
   function selectAdapter(adapterType: AdapterId) {
@@ -305,6 +378,32 @@ export default function ToolGymApp() {
     setNotice({ tone: "info", message });
   }
 
+  async function submitSimulationLab() {
+    if (!selectedLab || !currentAgent || !currentQualification?.coreQualified) return;
+    setBusy(true);
+    setNotice(null);
+    try {
+      const parsed = JSON.parse(labSubmission);
+      const response = await authFetch("/api/lab-attempts", {
+        method: "POST",
+        body: JSON.stringify({ agentId: currentAgent.id, labId: selectedLab.id, response: parsed }),
+      });
+      if (!response.ok) throw new Error(await readError(response));
+      const data = (await response.json()) as { grade: { score: number; passed: boolean }; receipt: { id: string } };
+      setNotice({
+        tone: data.grade.passed ? "good" : "bad",
+        message: data.grade.passed
+          ? `Simulation passed at ${data.grade.score}%. Receipt ${data.receipt.id.slice(0, 8)} issued.`
+          : `Simulation scored ${data.grade.score}%. The receipt is preserved; revise the response and run a new attempt.`,
+      });
+      await refreshDashboard();
+    } catch (error) {
+      setNotice({ tone: "bad", message: error instanceof Error ? error.message : "Simulation submission failed." });
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function copyConnectionPacket() {
     if (!currentAgent) return;
     await copy(
@@ -318,6 +417,8 @@ export default function ToolGymApp() {
         endpoints: {
           workouts: "/api/exercises",
           attempts: "/api/attempts",
+          simulationLabs: "/api/labs",
+          simulationAttempts: "/api/lab-attempts",
           dashboard: "/api/dashboard",
           fieldExams: "/api/field-exams",
         },
@@ -329,17 +430,17 @@ export default function ToolGymApp() {
   async function copyAgentInstructions() {
     if (!currentAgent) return;
     await copy(
-      `You are training in ToolGym as ${currentAgent.name}. Read the public workout catalog at ${window.location.origin}/api/exercises. For each workout, complete the packet using only authorized tools and return JSON matching responseShape. Submit through the private connection packet provided by your operator. Never expose the ToolGym bearer key, model credentials, private prompts, or customer data. Treat approval-required and out-of-scope actions as blocked.`,
+      `You are training in ToolGym as ${currentAgent.name}. Read the public workout catalog at ${window.location.origin}/api/exercises. Complete each packet using only authorized tools and return JSON matching responseShape. After the core workouts pass, read ${window.location.origin}/api/labs and complete one applied simulation. Submit only through the private connection packet provided by your operator. Never expose the ToolGym bearer key, model credentials, private prompts, or customer data. Treat approval-required and out-of-scope actions as blocked. Failed attempts remain part of the evidence record; do not claim success unless the receipt says passed.`,
       "Agent instructions copied.",
     );
   }
 
   const pathStatus = [
     { label: "Connect", done: Boolean(currentAgent) },
-    { label: "Train", done: (dashboard?.attempts.length ?? 0) > 0 },
-    { label: "Qualify", done: Boolean(dashboard?.qualification.qualified) },
-    { label: "Field test", done: dashboard?.fieldExams.some((exam) => exam.status === "approved") ?? false },
-    { label: "Credential", done: (dashboard?.credentials.length ?? 0) > 0 },
+    { label: "Workouts", done: Boolean(currentQualification?.coreQualified) },
+    { label: "Simulation", done: Boolean(currentQualification?.simulationQualified) },
+    { label: "Field test", done: candidateFieldExams.some((exam) => exam.status === "approved") },
+    { label: "Credential", done: candidateCredentials.length > 0 },
   ];
 
   return (
@@ -363,6 +464,7 @@ export default function ToolGymApp() {
       <aside className="sidebar" aria-label="ToolGym sections">
         <a className="nav-item active" href="#overview"><CircleGauge size={18} /><span>Overview</span></a>
         <a className="nav-item" href="#workouts"><Dumbbell size={18} /><span>Workouts</span></a>
+        <a className="nav-item" href="#simulation-labs"><FlaskConical size={18} /><span>Simulation labs</span></a>
         <a className="nav-item" href="#agent-gateway"><Cable size={18} /><span>Agent gateway</span></a>
         <a className="nav-item" href="#field-test"><ClipboardCheck size={18} /><span>Field test</span></a>
         <a className="nav-item" href="#credentials"><FileCheck2 size={18} /><span>Credentials</span></a>
@@ -379,7 +481,7 @@ export default function ToolGymApp() {
             <div className="onboarding-copy" id="overview">
               <p className="eyebrow">Agent qualification workspace</p>
               <h1 id="setup-title">Train tools.<br />Prove mastery.</h1>
-              <p className="lede">Register one agent, run four deterministic workouts, then submit real work for independent review.</p>
+              <p className="lede">Register one agent, pass deterministic workouts and a simulation lab, then submit bounded real work for independent review.</p>
               <div className="evidence-strip">
                 <span><Braces size={17} /> Versioned tests</span>
                 <span><LockKeyhole size={17} /> Private key</span>
@@ -418,9 +520,10 @@ export default function ToolGymApp() {
             <div className="section-heading"><div><p className="eyebrow">First session</p><h2 id="roadmap-title">What happens next</h2></div><p>Your agent stays in your environment. ToolGym receives structured answers and public evidence, never provider credentials.</p></div>
             <div className="roadmap-grid">
               <div className="roadmap-item" id="workouts"><span>02</span><Dumbbell size={20} /><div><strong>Run workouts</strong><p>Copy a versioned packet into your agent, then grade its structured response.</p></div></div>
-              <div className="roadmap-item" id="agent-gateway"><span>03</span><Cable size={20} /><div><strong>Connect the gateway</strong><p>Give your agent a private connection packet for API or CLI-driven training.</p></div></div>
-              <div className="roadmap-item" id="field-test"><span>04</span><ClipboardCheck size={20} /><div><strong>Complete field work</strong><p>Submit authorized real-world evidence after all core workouts pass.</p></div></div>
-              <div className="roadmap-item" id="credentials"><span>05</span><FileCheck2 size={20} /><div><strong>Publish mastery</strong><p>An independent proctor approves a portable, expiring credential.</p></div></div>
+              <div className="roadmap-item" id="simulation-labs"><span>03</span><FlaskConical size={20} /><div><strong>Pass a simulation</strong><p>Solve a realistic task packet that combines planning, safety, recovery, and proof.</p></div></div>
+              <div className="roadmap-item" id="agent-gateway"><span>04</span><Cable size={20} /><div><strong>Connect the gateway</strong><p>Give your agent a private connection packet for API or CLI-driven training.</p></div></div>
+              <div className="roadmap-item" id="field-test"><span>05</span><ClipboardCheck size={20} /><div><strong>Complete field work</strong><p>Submit authorized real-world evidence after training and simulation pass.</p></div></div>
+              <div className="roadmap-item" id="credentials"><span>06</span><FileCheck2 size={20} /><div><strong>Publish mastery</strong><p>An independent proctor approves a portable, expiring credential.</p></div></div>
             </div>
           </section>
           </>
@@ -432,9 +535,14 @@ export default function ToolGymApp() {
                 <h1>{currentAgent?.name ?? "Loading candidate"}</h1>
                 <p className="lede compact">{currentAgent ? `${currentAgent.tool_target} via ${currentAgent.adapter_label}` : "Restoring your workspace..."}</p>
               </div>
-              <button className="secondary-button" type="button" onClick={() => refreshDashboard()} disabled={busy}>
-                <RefreshCw size={17} /> Refresh evidence
-              </button>
+              <div className="overview-actions">
+                {(dashboard?.agents.length ?? 0) > 1 ? (
+                  <label className="candidate-control"><span>Candidate roster</span><select value={currentAgent?.id ?? ""} onChange={(event) => setSelectedAgentId(event.target.value)}>{dashboard?.agents.map((agent) => <option key={agent.id} value={agent.id}>{agent.name}</option>)}</select></label>
+                ) : null}
+                <button className="secondary-button" type="button" onClick={() => refreshDashboard()} disabled={busy}>
+                  <RefreshCw size={17} /> Refresh evidence
+                </button>
+              </div>
             </section>
 
             <section className="path-rail" aria-label="Qualification path">
@@ -448,10 +556,10 @@ export default function ToolGymApp() {
             </section>
 
             <section className="metric-row">
-              <div className="metric"><span>Workouts passed</span><strong>{dashboard?.qualification.passedExerciseIds.length ?? 0}<small>/4</small></strong></div>
-              <div className="metric"><span>Evidence receipts</span><strong>{dashboard?.attempts.length ?? 0}</strong></div>
-              <div className="metric"><span>Field status</span><strong className="metric-word">{dashboard?.qualification.qualified ? "Eligible" : "Training"}</strong></div>
-              <div className="metric accent"><span>Mastery credentials</span><strong>{dashboard?.credentials.length ?? 0}</strong></div>
+              <div className="metric"><span>Workouts passed</span><strong>{currentQualification?.passedExerciseIds.length ?? 0}<small>/{exercises.length || 4}</small></strong></div>
+              <div className="metric"><span>Simulation labs</span><strong>{currentQualification?.passedLabIds.length ?? 0}<small>/{labs.length || 4}</small></strong></div>
+              <div className="metric"><span>Evidence receipts</span><strong>{candidateAttempts.length + candidateLabAttempts.length}</strong></div>
+              <div className="metric accent"><span>Mastery credentials</span><strong>{candidateCredentials.length}</strong></div>
             </section>
 
             <section className="workout-section" id="workouts">
@@ -500,14 +608,62 @@ export default function ToolGymApp() {
 
                 <aside className="receipt-stack" aria-label="Latest evidence receipts">
                   <div className="receipt-heading"><FileCheck2 size={18} /><h3>Evidence stack</h3></div>
-                  {(dashboard?.attempts ?? []).slice(0, 5).map((attempt) => (
+                  {candidateAttempts.slice(0, 5).map((attempt) => (
                     <a className="receipt-row" href={`/api/receipts/${attempt.id}`} target="_blank" rel="noreferrer" key={attempt.id}>
                       <span className={attempt.passed ? "receipt-status good" : "receipt-status bad"}>{attempt.passed ? <Check size={13} /> : "×"}</span>
                       <span><strong>{exercises.find((exercise) => exercise.id === attempt.exercise_id)?.title ?? attempt.exercise_id}</strong><small>{attempt.evidence_hash.slice(0, 14)}...</small></span>
                       <ExternalLink size={14} />
                     </a>
                   ))}
-                  {(dashboard?.attempts.length ?? 0) === 0 ? <div className="empty-state"><Bot size={25} /><p>Receipts appear after the first graded attempt.</p></div> : null}
+                  {candidateAttempts.length === 0 ? <div className="empty-state"><Bot size={25} /><p>Receipts appear after the first graded attempt.</p></div> : null}
+                </aside>
+              </div>
+            </section>
+
+            <section className="simulation-section" id="simulation-labs">
+              <div className="section-heading">
+                <div><p className="eyebrow">Applied qualification</p><h2>Simulation labs</h2></div>
+                <p>After the core circuit, the candidate solves one realistic, evidence-bearing task packet before field work unlocks.</p>
+              </div>
+              <div className={`workout-grid simulation-grid ${currentQualification?.coreQualified ? "" : "locked"}`}>
+                <div className="workout-list" role="tablist" aria-label="Available simulation labs">
+                  {labs.map((lab, index) => {
+                    const attempt = candidateLabAttempts.find((item) => item.lab_id === lab.id);
+                    return (
+                      <button className={`workout-tab ${selectedLab?.id === lab.id ? "active" : ""}`} type="button" role="tab" aria-selected={selectedLab?.id === lab.id} key={lab.id} onClick={() => selectLab(lab)} disabled={!currentQualification?.coreQualified}>
+                        <span className="workout-index lane-simulation">{String(index + 1).padStart(2, "0")}</span>
+                        <span><strong>{lab.title}</strong><small>{lab.estimatedMinutes} min · level {lab.difficulty}</small></span>
+                        {attempt ? <span className={`score-chip ${attempt.passed ? "passed" : "failed"}`}>{attempt.score}%</span> : <ChevronRight size={17} />}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {selectedLab ? (
+                  <div className="workout-console" role="tabpanel">
+                    <div className="console-head">
+                      <div><span className="lane-tag lane-simulation">simulation</span><h3>{selectedLab.title}</h3><p>{selectedLab.summary}</p></div>
+                      <button className="icon-button light" type="button" title="Copy simulation packet" aria-label="Copy simulation packet" onClick={() => copy(pretty({ lab: selectedLab }), "Simulation packet copied.")} disabled={!currentQualification?.coreQualified}><Copy size={18} /></button>
+                    </div>
+                    {currentQualification?.coreQualified ? (
+                      <>
+                        <div className="packet-block"><div className="code-label"><span>SIMULATION PACKET</span><span>v{selectedLab.version}</span></div><pre>{pretty(selectedLab.packet)}</pre></div>
+                        <label className="output-label">Agent output<textarea spellCheck={false} value={labSubmission} onChange={(event) => setLabSubmission(event.target.value)} /></label>
+                        <div className="console-actions"><span>Pass score {selectedLab.passScore}%</span><button className="primary-button compact-button" type="button" onClick={submitSimulationLab} disabled={busy}><Play size={16} fill="currentColor" /> Grade simulation</button></div>
+                      </>
+                    ) : <div className="simulation-lock"><LockKeyhole size={26} /><div><strong>Core circuit required</strong><p>Pass every workout as this candidate to open applied simulations.</p></div></div>}
+                  </div>
+                ) : null}
+
+                <aside className="receipt-stack" aria-label="Simulation receipts">
+                  <div className="receipt-heading"><FlaskConical size={18} /><h3>Lab evidence</h3></div>
+                  {candidateLabAttempts.slice(0, 5).map((attempt) => (
+                    <a className="receipt-row" href={`/api/lab-receipts/${attempt.id}`} target="_blank" rel="noreferrer" key={attempt.id}>
+                      <span className={attempt.passed ? "receipt-status good" : "receipt-status bad"}>{attempt.passed ? <Check size={13} /> : "×"}</span>
+                      <span><strong>{labs.find((lab) => lab.id === attempt.lab_id)?.title ?? attempt.lab_id}</strong><small>{attempt.evidence_hash.slice(0, 14)}...</small></span><ExternalLink size={14} />
+                    </a>
+                  ))}
+                  {candidateLabAttempts.length === 0 ? <div className="empty-state"><FlaskConical size={25} /><p>Complete the core circuit to begin simulation work.</p></div> : null}
                 </aside>
               </div>
             </section>
@@ -535,22 +691,22 @@ export default function ToolGymApp() {
                 <p className="eyebrow">Independent validation</p>
                 <h2>Field test</h2>
                 <p>A qualifying agent completes authorized real work. A separate human reviews the evidence before mastery is issued.</p>
-                <div className={`eligibility ${dashboard?.qualification.qualified ? "unlocked" : ""}`}>
-                  {dashboard?.qualification.qualified ? <ShieldCheck size={20} /> : <LockKeyhole size={20} />}
-                  <span>{dashboard?.qualification.qualified ? "Field test unlocked" : `Pass ${4 - (dashboard?.qualification.passedExerciseIds.length ?? 0)} more workout(s)`}</span>
+                <div className={`eligibility ${currentQualification?.fieldEligible ? "unlocked" : ""}`}>
+                  {currentQualification?.fieldEligible ? <ShieldCheck size={20} /> : <LockKeyhole size={20} />}
+                  <span>{currentQualification?.fieldEligible ? "Field test unlocked" : currentQualification?.coreQualified ? "Pass one simulation lab" : `Pass ${Math.max(0, exercises.length - (currentQualification?.passedExerciseIds.length ?? 0))} more workout(s)`}</span>
                 </div>
               </div>
               <form className="field-form" onSubmit={requestFieldTest}>
-                <label>Real task summary<textarea value={fieldTest.taskSummary} onChange={(event) => setFieldTest({ ...fieldTest, taskSummary: event.target.value })} placeholder="Describe the authorized task and expected result." required disabled={!dashboard?.qualification.qualified} /></label>
+                <label>Real task summary<textarea value={fieldTest.taskSummary} onChange={(event) => setFieldTest({ ...fieldTest, taskSummary: event.target.value })} placeholder="Describe the authorized task and expected result." required disabled={!currentQualification?.fieldEligible} /></label>
                 <div className="two-col">
-                  <label>Evidence URL<input type="url" value={fieldTest.evidenceUrl} onChange={(event) => setFieldTest({ ...fieldTest, evidenceUrl: event.target.value })} placeholder="https://..." required disabled={!dashboard?.qualification.qualified} /></label>
-                  <label>Environment<input value={fieldTest.environmentLabel} onChange={(event) => setFieldTest({ ...fieldTest, environmentLabel: event.target.value })} placeholder="GitHub sandbox, July 2026" required disabled={!dashboard?.qualification.qualified} /></label>
+                  <label>Evidence URL<input type="url" value={fieldTest.evidenceUrl} onChange={(event) => setFieldTest({ ...fieldTest, evidenceUrl: event.target.value })} placeholder="https://..." required disabled={!currentQualification?.fieldEligible} /></label>
+                  <label>Environment<input value={fieldTest.environmentLabel} onChange={(event) => setFieldTest({ ...fieldTest, environmentLabel: event.target.value })} placeholder="GitHub sandbox, July 2026" required disabled={!currentQualification?.fieldEligible} /></label>
                 </div>
                 <label className="attestation-control">
-                  <input type="checkbox" checked={fieldTest.confirmPublicEvidence} onChange={(event) => setFieldTest({ ...fieldTest, confirmPublicEvidence: event.target.checked })} required disabled={!dashboard?.qualification.qualified} />
+                  <input type="checkbox" checked={fieldTest.confirmPublicEvidence} onChange={(event) => setFieldTest({ ...fieldTest, confirmPublicEvidence: event.target.checked })} required disabled={!currentQualification?.fieldEligible} />
                   <span>I confirm this evidence is public, authorized to share, and contains no credentials, private prompts, or customer secrets.</span>
                 </label>
-                <button className="primary-button" type="submit" disabled={busy || !dashboard?.qualification.qualified}><ClipboardCheck size={17} /> Request proctor review</button>
+                <button className="primary-button" type="submit" disabled={busy || !currentQualification?.fieldEligible}><ClipboardCheck size={17} /> Request proctor review</button>
                 {reviewUrl ? (
                   <div className="review-link"><input readOnly value={reviewUrl} /><button className="icon-button light" type="button" onClick={() => copy(reviewUrl, "Private proctor link copied.")} title="Copy private proctor link" aria-label="Copy private proctor link"><Copy size={17} /></button></div>
                 ) : null}
@@ -560,14 +716,14 @@ export default function ToolGymApp() {
             <section className="credentials-section" id="credentials">
               <div className="section-heading"><div><p className="eyebrow">Portable record</p><h2>Credentials</h2></div><p>Credentials expire after 180 days so mastery stays current.</p></div>
               <div className="credential-list">
-                {(dashboard?.credentials ?? []).map((credential) => (
+                {candidateCredentials.map((credential) => (
                   <a className="credential-card" href={`/verify/${credential.id}`} key={credential.id}>
                     <span className="credential-seal"><ShieldCheck size={24} /></span>
                     <span><small>AGENT TOOL MASTERY</small><strong>{currentAgent?.tool_target}</strong><em>{credential.status.replaceAll("_", " ")}</em></span>
                     <ChevronRight size={19} />
                   </a>
                 ))}
-                {(dashboard?.credentials.length ?? 0) === 0 ? <div className="credential-empty"><KeyRound size={23} /><div><p>No mastery credential yet. Qualification alone does not issue one.</p><a href={dashboard?.qualification.qualified ? "#field-test" : "#workouts"}>{dashboard?.qualification.qualified ? "Submit the field test" : "Finish the core workouts"}</a></div></div> : null}
+                {candidateCredentials.length === 0 ? <div className="credential-empty"><KeyRound size={23} /><div><p>No mastery credential yet. Qualification alone does not issue one.</p><a href={currentQualification?.fieldEligible ? "#field-test" : currentQualification?.coreQualified ? "#simulation-labs" : "#workouts"}>{currentQualification?.fieldEligible ? "Submit the field test" : currentQualification?.coreQualified ? "Pass a simulation lab" : "Finish the core workouts"}</a></div></div> : null}
               </div>
             </section>
           </>

@@ -87,9 +87,9 @@ export const TOOL_TARGETS = [
 export function buildGatewayManifest(baseUrl: string) {
   return {
     schema: "https://toolgym.ai/schemas/agent-gateway/v1",
-    version: "1.0.0",
+    version: "1.1.0",
     name: "ToolGym Agent Gateway",
-    description: "Model-neutral REST gateway for registering agents, fetching workouts, submitting attempts, and reading qualification evidence.",
+    description: "Model-neutral REST gateway for registering agents, completing workouts and simulations, and reading qualification evidence.",
     baseUrl,
     authentication: {
       type: "bearer",
@@ -104,6 +104,8 @@ export function buildGatewayManifest(baseUrl: string) {
       registerAgent: { method: "POST", path: "/api/agents", authentication: true },
       listWorkouts: { method: "GET", path: "/api/exercises", authentication: false },
       submitAttempt: { method: "POST", path: "/api/attempts", authentication: true },
+      listSimulationLabs: { method: "GET", path: "/api/labs", authentication: false },
+      submitSimulationAttempt: { method: "POST", path: "/api/lab-attempts", authentication: true },
       readDashboard: { method: "GET", path: "/api/dashboard", authentication: true },
       requestFieldExam: { method: "POST", path: "/api/field-exams", authentication: true },
     },
@@ -111,7 +113,8 @@ export function buildGatewayManifest(baseUrl: string) {
       "Create a workspace and store the one-time ToolGym API key privately.",
       "Register the candidate agent and describe how it reaches the target tool.",
       "Fetch a workout packet, run it in the user's own agent environment, and submit only the structured result.",
-      "Pass all core workouts, submit public authorized field evidence, and obtain independent proctor review.",
+      "Pass every core workout and at least one applied simulation lab.",
+      "Submit public authorized field evidence and obtain independent proctor review.",
     ],
   } as const;
 }

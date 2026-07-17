@@ -51,6 +51,19 @@ export async function ensureSchema(): Promise<void> {
         evidence_hash TEXT NOT NULL,
         created_at TEXT NOT NULL
       )`),
+      db.prepare(`CREATE TABLE IF NOT EXISTS lab_attempts (
+        id TEXT PRIMARY KEY,
+        workspace_id TEXT NOT NULL,
+        agent_id TEXT NOT NULL,
+        lab_id TEXT NOT NULL,
+        lab_version TEXT NOT NULL,
+        response_json TEXT NOT NULL,
+        criteria_json TEXT NOT NULL,
+        score INTEGER NOT NULL,
+        passed INTEGER NOT NULL,
+        evidence_hash TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      )`),
       db.prepare(`CREATE TABLE IF NOT EXISTS field_exams (
         id TEXT PRIMARY KEY,
         workspace_id TEXT NOT NULL,
@@ -80,6 +93,10 @@ export async function ensureSchema(): Promise<void> {
       )`),
       db.prepare("CREATE INDEX IF NOT EXISTS agents_workspace_idx ON agents(workspace_id)"),
       db.prepare("CREATE INDEX IF NOT EXISTS attempts_agent_idx ON attempts(agent_id, created_at)"),
+      db.prepare(
+        "CREATE INDEX IF NOT EXISTS lab_attempts_workspace_agent_idx ON lab_attempts(workspace_id, agent_id, created_at)",
+      ),
+      db.prepare("CREATE INDEX IF NOT EXISTS lab_attempts_lab_idx ON lab_attempts(lab_id, lab_version)"),
       db.prepare("CREATE INDEX IF NOT EXISTS exams_agent_idx ON field_exams(agent_id, created_at)"),
       db.prepare("CREATE INDEX IF NOT EXISTS credentials_agent_idx ON credentials(agent_id, issued_at)"),
     ]);

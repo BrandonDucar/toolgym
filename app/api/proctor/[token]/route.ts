@@ -3,8 +3,9 @@ import { responseFromError } from "@/lib/auth";
 import { sha256 } from "@/lib/crypto";
 import { database, ensureSchema, runtimeEnv } from "@/lib/database";
 import { issueCredential } from "@/lib/credentials";
-import type { AgentRecord, AttemptRecord, FieldExamRecord } from "@/lib/contracts";
+import type { AgentRecord, AttemptRecord, FieldExamRecord, LabAttemptRecord } from "@/lib/contracts";
 import { EXERCISES } from "@/lib/catalog";
+import { LABS } from "@/lib/labs";
 
 const decisionSchema = z.object({
   decision: z.enum(["approved", "rejected"]),
@@ -33,12 +34,14 @@ export async function GET(_request: Request, context: Context) {
     const { token } = await context.params;
     const found = await findExam(token);
     if (!found) return Response.json({ error: "Review request not found." }, { status: 404 });
-    const attempts = await database()
-      .prepare("SELECT * FROM attempts WHERE agent_id = ? AND passed = 1 ORDER BY created_at DESC")
-      .bind(found.agent.id)
-      .all<AttemptRecord>();
+    const [attempts, labAttempts] = await Promise.all([
+      database().prepare("SELECT * FROM attempts WHERE agent_id = ? AND passed = 1 ORDER BY created_at DESC").bind(found.agent.id).all<AttemptRecord>(),
+      database().prepare("SELECT * FROM lab_attempts WHERE agent_id = ? AND passed = 1 ORDER BY created_at DESC").bind(found.agent.id).all<LabAttemptRecord>(),
+    ]);
     const latest = new Map<string, AttemptRecord>();
     for (const attempt of attempts.results) if (!latest.has(attempt.exercise_id)) latest.set(attempt.exercise_id, attempt);
+    const latestLabs = new Map<string, LabAttemptRecord>();
+    for (const attempt of labAttempts.results) if (!latestLabs.has(attempt.lab_id)) latestLabs.set(attempt.lab_id, attempt);
     return Response.json({
       fieldExam: {
         id: found.fieldExam.id,
@@ -68,6 +71,17 @@ export async function GET(_request: Request, context: Context) {
           passed: Boolean(attempt),
         };
       }),
+      simulations: LABS.map((lab) => {
+        const attempt = latestLabs.get(lab.id);
+        return {
+          labId: lab.id,
+          title: lab.title,
+          version: attempt?.lab_version,
+          score: attempt?.score,
+          evidenceHash: attempt?.evidence_hash,
+          passed: Boolean(attempt),
+        };
+      }).filter((lab) => lab.passed),
     });
   } catch (error) {
     return responseFromError(error);
@@ -109,6 +123,19 @@ export async function POST(request: Request, context: Context) {
     if (attempts.length !== EXERCISES.length) {
       return Response.json({ error: "The workout evidence is no longer complete." }, { status: 409 });
     }
+    const passingLabs = await db
+      .prepare("SELECT * FROM lab_attempts WHERE agent_id = ? AND passed = 1 ORDER BY created_at DESC")
+      .bind(found.agent.id)
+      .all<LabAttemptRecord>();
+    const validLabIds = new Set(LABS.map((lab) => lab.id));
+    const latestLabs = new Map<string, LabAttemptRecord>();
+    for (const attempt of passingLabs.results) {
+      if (validLabIds.has(attempt.lab_id) && !latestLabs.has(attempt.lab_id)) latestLabs.set(attempt.lab_id, attempt);
+    }
+    const labAttempts = [...latestLabs.values()];
+    if (labAttempts.length === 0) {
+      return Response.json({ error: "The simulation evidence is no longer complete." }, { status: 409 });
+    }
 
     const credentialId = crypto.randomUUID();
     const updatedExam: FieldExamRecord = {
@@ -124,6 +151,7 @@ export async function POST(request: Request, context: Context) {
       origin,
       agent: found.agent,
       attempts,
+      labAttempts,
       fieldExam: updatedExam,
       privateJwk: runtimeEnv().TOOLGYM_SIGNING_PRIVATE_JWK,
     });

@@ -1,4 +1,4 @@
-import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 export const workspaces = sqliteTable("workspaces", {
   id: text("id").primaryKey(),
@@ -30,6 +30,27 @@ export const attempts = sqliteTable("attempts", {
   evidenceHash: text("evidence_hash").notNull(),
   createdAt: text("created_at").notNull(),
 });
+
+export const labAttempts = sqliteTable(
+  "lab_attempts",
+  {
+    id: text("id").primaryKey(),
+    workspaceId: text("workspace_id").notNull(),
+    agentId: text("agent_id").notNull(),
+    labId: text("lab_id").notNull(),
+    labVersion: text("lab_version").notNull(),
+    responseJson: text("response_json").notNull(),
+    criteriaJson: text("criteria_json").notNull(),
+    score: integer("score").notNull(),
+    passed: integer("passed", { mode: "boolean" }).notNull(),
+    evidenceHash: text("evidence_hash").notNull(),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [
+    index("lab_attempts_workspace_agent_idx").on(table.workspaceId, table.agentId, table.createdAt),
+    index("lab_attempts_lab_idx").on(table.labId, table.labVersion),
+  ],
+);
 
 export const fieldExams = sqliteTable("field_exams", {
   id: text("id").primaryKey(),

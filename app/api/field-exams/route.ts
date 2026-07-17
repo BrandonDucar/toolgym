@@ -1,9 +1,9 @@
 import { z } from "zod";
 import { requireWorkspace, responseFromError } from "@/lib/auth";
 import { database } from "@/lib/database";
-import { EXERCISES, hasQualified } from "@/lib/catalog";
 import { generateReviewToken, sha256 } from "@/lib/crypto";
 import type { AgentRecord, FieldExamRecord } from "@/lib/contracts";
+import { loadFieldExamQualification } from "@/lib/labs";
 
 const inputSchema = z.object({
   agentId: z.string().uuid(),
@@ -37,14 +37,15 @@ export async function POST(request: Request) {
       .first<AgentRecord>();
     if (!agent) return Response.json({ error: "Agent not found." }, { status: 404 });
 
-    const passing = await db
-      .prepare("SELECT DISTINCT exercise_id FROM attempts WHERE workspace_id = ? AND agent_id = ? AND passed = 1")
-      .bind(workspace.id, agent.id)
-      .all<{ exercise_id: string }>();
-    const passedIds = passing.results.map((row) => row.exercise_id);
-    if (!hasQualified(passedIds)) {
-      const missing = EXERCISES.filter((exercise) => !passedIds.includes(exercise.id)).map((exercise) => exercise.title);
-      return Response.json({ error: "Complete every core workout before requesting a field test.", missing }, { status: 409 });
+    const qualification = await loadFieldExamQualification(db, workspace.id, agent.id);
+    if (!qualification.canRequestFieldExam) {
+      return Response.json(
+        {
+          error: "Complete every core workout and pass at least one simulation lab before requesting a field test.",
+          missing: qualification.missing,
+        },
+        { status: 409 },
+      );
     }
 
     const reviewToken = generateReviewToken();

@@ -25,6 +25,23 @@ test("public catalog never exposes answer keys", () => {
   assert.equal("expectedAnswers" in exposed, false);
 });
 
+test("descriptive evidence labels do not behave like hidden answer keys", () => {
+  const selection = EXERCISES.find((item) => item.id === "tool-selection");
+  const recovery = EXERCISES.find((item) => item.id === "recovery-routing");
+  assert.ok(selection);
+  assert.ok(recovery);
+
+  const selectionResult = gradeExercise(selection, {
+    answers: selection.expectedAnswers.map((answer, index) => ({ ...answer, reasonCode: `candidate_reason_${index}` })),
+  });
+  const recoveryResult = gradeExercise(recovery, {
+    answers: recovery.expectedAnswers.map((answer, index) => ({ ...answer, receiptStatus: `candidate_status_${index}` })),
+  });
+
+  assert.equal(selectionResult.passed, true);
+  assert.equal(recoveryResult.passed, true);
+});
+
 test("qualification requires every current core workout", () => {
   assert.equal(hasQualified(EXERCISES.map((exercise) => exercise.id)), true);
   assert.equal(hasQualified(EXERCISES.slice(0, -1).map((exercise) => exercise.id)), false);

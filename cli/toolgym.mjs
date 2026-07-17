@@ -18,8 +18,10 @@ function usage() {
 
 Commands:
   exercises --url URL
+  labs --url URL
   dashboard --url URL --key API_KEY
   submit --url URL --key API_KEY --agent ID --exercise ID --file answer.json
+  submit-lab --url URL --key API_KEY --agent ID --lab ID --file answer.json
 `);
 }
 
@@ -40,6 +42,8 @@ if (!command || !options.url) {
   try {
     if (command === "exercises") {
       console.log(JSON.stringify(await request(options.url, "/api/exercises"), null, 2));
+    } else if (command === "labs") {
+      console.log(JSON.stringify(await request(options.url, "/api/labs"), null, 2));
     } else if (command === "dashboard") {
       if (!options.key) throw new Error("--key is required");
       console.log(JSON.stringify(await request(options.url, "/api/dashboard", {
@@ -54,6 +58,16 @@ if (!command || !options.url) {
         method: "POST",
         headers: { authorization: `Bearer ${options.key}`, "content-type": "application/json" },
         body: JSON.stringify({ agentId: options.agent, exerciseId: options.exercise, response }),
+      }), null, 2));
+    } else if (command === "submit-lab") {
+      for (const required of ["key", "agent", "lab", "file"]) {
+        if (!options[required]) throw new Error(`--${required} is required`);
+      }
+      const response = JSON.parse(await readFile(options.file, "utf8"));
+      console.log(JSON.stringify(await request(options.url, "/api/lab-attempts", {
+        method: "POST",
+        headers: { authorization: `Bearer ${options.key}`, "content-type": "application/json" },
+        body: JSON.stringify({ agentId: options.agent, labId: options.lab, response }),
       }), null, 2));
     } else {
       usage();

@@ -455,7 +455,7 @@ legend {
 
 .roadmap-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   border-top: 1px solid var(--line-dark);
   border-bottom: 1px solid var(--line-dark);
 }
@@ -473,6 +473,14 @@ legend {
 
 .roadmap-item:last-child {
   border-right: 0;
+}
+
+.roadmap-item:nth-child(3) {
+  border-right: 0;
+}
+
+.roadmap-item:nth-child(-n + 3) {
+  border-bottom: 1px solid var(--line);
 }
 
 .roadmap-item > span {
@@ -573,6 +581,25 @@ legend {
 .overview h1 {
   margin-bottom: 6px;
   font-size: 42px;
+}
+
+.overview-actions {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.candidate-control {
+  min-width: 230px;
+  margin: 0;
+}
+
+.candidate-control span {
+  margin-bottom: 5px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
 }
 
 .path-rail {
@@ -678,6 +705,7 @@ legend {
 }
 
 .workout-section,
+.simulation-section,
 .credentials-section,
 .gateway-section {
   max-width: 1320px;
@@ -868,6 +896,36 @@ legend {
 .lane-execution { background: #91aef5; }
 .lane-safety { background: var(--coral); }
 .lane-recovery { background: var(--lime); }
+.lane-simulation { background: #f2b96b; }
+
+.simulation-grid.locked .workout-tab {
+  opacity: 0.62;
+  cursor: not-allowed;
+}
+
+.simulation-lock {
+  min-height: 260px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 28px;
+  color: var(--muted);
+  text-align: left;
+}
+
+.simulation-lock strong {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--ink);
+}
+
+.simulation-lock p {
+  max-width: 360px;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+}
 
 .score-chip {
   min-width: 44px;
@@ -1478,7 +1536,11 @@ pre {
     border-right: 0;
   }
 
-  .roadmap-item:nth-child(-n + 2) {
+  .roadmap-item:nth-child(3) {
+    border-right: 1px solid var(--line);
+  }
+
+  .roadmap-item:nth-child(-n + 4) {
     border-bottom: 1px solid var(--line);
   }
 }
@@ -1599,6 +1661,17 @@ pre {
     font-size: 34px;
   }
 
+  .overview-actions {
+    width: 100%;
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .candidate-control,
+  .overview-actions .secondary-button {
+    width: 100%;
+  }
+
   .section-heading > p {
     text-align: left;
   }
@@ -1613,7 +1686,8 @@ pre {
   }
 
   .roadmap-item,
-  .roadmap-item:nth-child(2) {
+  .roadmap-item:nth-child(2),
+  .roadmap-item:nth-child(3) {
     border-right: 0;
     border-bottom: 1px solid var(--line);
   }

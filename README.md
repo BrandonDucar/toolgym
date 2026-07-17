@@ -2,11 +2,12 @@
 
 ToolGym is a model-neutral training and evidence platform for AI agents that use tools.
 
-An agent does not earn mastery because it claims a skill or completes a random benchmark. ToolGym separates the qualification path into three artifacts:
+An agent does not earn mastery because it claims a skill or completes a random benchmark. ToolGym separates the qualification path into four artifacts:
 
 1. **Workout receipt** - deterministic evidence from one versioned exercise.
-2. **Qualification record** - proof that every required workout passed.
-3. **Mastery credential** - issued only after an independent proctor reviews authorized real-world work.
+2. **Simulation receipt** - evidence from a realistic, multi-step applied problem.
+3. **Qualification record** - proof that every required workout and at least one simulation passed.
+4. **Mastery credential** - issued only after an independent proctor reviews authorized real-world work.
 
 > Status: public alpha. The evidence model is implemented and usable, but ToolGym is not yet an accredited certification authority or a certified Open Badges issuer.
 
@@ -15,6 +16,7 @@ An agent does not earn mastery because it claims a skill or completes a random b
 - Self-service workspaces with one-time API keys stored as hashes.
 - Model- and vendor-neutral agent profiles for MCP, OpenAPI, CLI, and webhook adapters.
 - Four deterministic core workouts: tool selection, argument discipline, approval gates, and recovery routing.
+- Four applied simulation labs: secure repository change, incident recovery, grounded research, and community operations.
 - Versioned grading criteria with critical safety failures.
 - Public, content-addressed workout receipts.
 - Qualification gating before a field test can be requested.
@@ -32,6 +34,7 @@ Registered candidate
   -> workout attempts
   -> deterministic receipts
   -> core qualification
+  -> applied simulation receipt
   -> authorized real task
   -> independent review
   -> signed mastery credential
@@ -71,6 +74,9 @@ Store the private JWK as `TOOLGYM_SIGNING_PRIVATE_JWK` and the public JWK as `TO
 | `GET` | `/api/exercises` | Read the public workout catalog |
 | `GET` | `/api/gateway` | Read the model-neutral gateway manifest and supported target catalog |
 | `POST` | `/api/attempts` | Grade an agent output and issue a receipt |
+| `GET` | `/api/labs` | Read the public applied-simulation catalog |
+| `POST` | `/api/lab-attempts` | Grade a simulation and issue a public receipt |
+| `GET` | `/api/lab-receipts/:id` | Inspect a public simulation receipt |
 | `GET` | `/api/dashboard` | Read workspace qualification state |
 | `GET/POST` | `/api/field-exams` | List or request a proctored field test |
 | `GET/POST` | `/api/proctor/:token` | Review field evidence using a private token |
@@ -88,8 +94,11 @@ The web workspace can generate a private connection packet containing the ToolGy
 
 ```bash
 node cli/toolgym.mjs exercises --url https://your-toolgym.example
+node cli/toolgym.mjs labs --url https://your-toolgym.example
 node cli/toolgym.mjs submit --url https://your-toolgym.example --key tg_live_... \
   --agent AGENT_ID --exercise tool-selection --file answer.json
+node cli/toolgym.mjs submit-lab --url https://your-toolgym.example --key tg_live_... \
+  --agent AGENT_ID --lab secure-repository-change --file simulation-answer.json
 ```
 
 ## DreamNet Boundary

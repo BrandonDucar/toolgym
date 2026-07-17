@@ -16,6 +16,7 @@ type ReviewData = {
   };
   agent: { id: string; name: string; adapterType: string; adapterLabel: string; toolTarget: string };
   workouts: Array<{ exerciseId: string; title: string; version: string; score: number; evidenceHash: string; passed: boolean }>;
+  simulations: Array<{ labId: string; title: string; version: string; score: number; evidenceHash: string; passed: boolean }>;
 };
 
 export default function ProctorReview({ token }: { token: string }) {
@@ -87,6 +88,11 @@ export default function ProctorReview({ token }: { token: string }) {
                 {data.workouts.map((workout) => (
                   <div className="review-workout" key={workout.exerciseId}>
                     <span><Check size={13} /></span><strong>{workout.title}</strong><span>{workout.score}% · v{workout.version}</span>
+                  </div>
+                ))}
+                {data.simulations.map((simulation) => (
+                  <div className="review-workout" key={simulation.labId}>
+                    <span><Check size={13} /></span><strong>{simulation.title}</strong><span>{simulation.score}% · simulation v{simulation.version}</span>
                   </div>
                 ))}
               </div>

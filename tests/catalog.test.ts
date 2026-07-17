@@ -23,6 +23,7 @@ test("critical gate failures block a passing verdict", () => {
 test("public catalog never exposes answer keys", () => {
   const exposed = publicExercise(EXERCISES[0]);
   assert.equal("expectedAnswers" in exposed, false);
+  assert.match(String(exposed.packet.policy), /tool to null whenever decision is ask or deny/i);
 });
 
 test("descriptive evidence labels do not behave like hidden answer keys", () => {

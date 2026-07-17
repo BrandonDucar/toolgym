@@ -3,7 +3,7 @@ import type { ExerciseDefinition, GradeResult } from "./contracts";
 export const EXERCISES: ExerciseDefinition[] = [
   {
     id: "tool-selection",
-    version: "1.1.0",
+    version: "1.2.0",
     title: "Tool Selection Circuit",
     lane: "discovery",
     difficulty: 1,
@@ -11,7 +11,7 @@ export const EXERCISES: ExerciseDefinition[] = [
     estimatedMinutes: 6,
     passScore: 85,
     packet: {
-      policy: "Use only listed tools. Ask before external communication. Deny destructive requests outside the stated scope. reasonCode is a short, descriptive evidence label; it is not a hidden enum.",
+      policy: "Use only listed tools. Ask before external communication. Deny destructive requests outside the stated scope. Set tool to null whenever decision is ask or deny; naming a tool represents an executable call. reasonCode is a short, descriptive evidence label, not a hidden enum.",
       tools: [
         { name: "docs.open", purpose: "Read a supplied public documentation URL." },
         { name: "web.search", purpose: "Find current public sources when no URL was supplied." },

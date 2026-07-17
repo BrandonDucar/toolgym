@@ -36,3 +36,4 @@ yarn-error.log*
 
 # generated types
 next-env.d.ts
+*.tsbuildinfo

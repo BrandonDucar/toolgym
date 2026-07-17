@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Bot,
   Braces,
+  Cable,
   Check,
   ChevronRight,
   CircleGauge,
@@ -19,6 +20,7 @@ import {
   RefreshCw,
   ShieldCheck,
 } from "lucide-react";
+import { ADAPTERS, CUSTOM_TOOL_TARGET_ID, TOOL_TARGETS, type AdapterId } from "@/lib/gateway";
 
 type Exercise = {
   id: string;
@@ -70,6 +72,8 @@ type Dashboard = {
 };
 
 const STORAGE_KEY = "toolgym_api_key";
+const DEFAULT_ADAPTER = ADAPTERS[0];
+const DEFAULT_TOOL_TARGET = TOOL_TARGETS[0];
 
 function pretty(value: unknown) {
   return JSON.stringify(value, null, 2);
@@ -89,12 +93,14 @@ export default function ToolGymApp() {
   const [notice, setNotice] = useState<{ tone: "good" | "bad" | "info"; message: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [reviewUrl, setReviewUrl] = useState("");
+  const [restoreKey, setRestoreKey] = useState("");
   const [setup, setSetup] = useState({
     workspaceName: "My agent lab",
     agentName: "",
-    adapterType: "mcp",
-    adapterLabel: "",
-    toolTarget: "",
+    adapterType: DEFAULT_ADAPTER.id as AdapterId,
+    adapterLabel: DEFAULT_ADAPTER.suggestedLabel,
+    toolTargetId: DEFAULT_TOOL_TARGET.id as string,
+    customToolTarget: "",
   });
   const [fieldTest, setFieldTest] = useState({ taskSummary: "", evidenceUrl: "", environmentLabel: "", confirmPublicEvidence: false });
 
@@ -170,6 +176,8 @@ export default function ToolGymApp() {
 
   const selected = useMemo(() => exercises.find((exercise) => exercise.id === selectedId) ?? exercises[0], [exercises, selectedId]);
   const currentAgent = dashboard?.agents[0];
+  const selectedAdapter = ADAPTERS.find((adapter) => adapter.id === setup.adapterType) ?? DEFAULT_ADAPTER;
+  const selectedTarget = TOOL_TARGETS.find((target) => target.id === setup.toolTargetId) ?? DEFAULT_TOOL_TARGET;
   const latestAttempts = useMemo(() => {
     const map = new Map<string, Dashboard["attempts"][number]>();
     for (const attempt of dashboard?.attempts ?? []) if (!map.has(attempt.exercise_id)) map.set(attempt.exercise_id, attempt);
@@ -181,11 +189,23 @@ export default function ToolGymApp() {
     setSubmission(pretty(exercise.responseShape));
   }
 
+  function selectAdapter(adapterType: AdapterId) {
+    const current = ADAPTERS.find((adapter) => adapter.id === setup.adapterType) ?? DEFAULT_ADAPTER;
+    const next = ADAPTERS.find((adapter) => adapter.id === adapterType) ?? DEFAULT_ADAPTER;
+    setSetup((value) => ({
+      ...value,
+      adapterType,
+      adapterLabel: !value.adapterLabel || value.adapterLabel === current.suggestedLabel ? next.suggestedLabel : value.adapterLabel,
+    }));
+  }
+
   async function onboard(event: React.FormEvent) {
     event.preventDefault();
     setBusy(true);
     setNotice(null);
     try {
+      const toolTarget = setup.toolTargetId === CUSTOM_TOOL_TARGET_ID ? setup.customToolTarget.trim() : selectedTarget.label;
+      if (!toolTarget) throw new Error("Describe the custom tool or skill your agent will train on.");
       const workspaceResponse = await fetch("/api/workspaces", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -201,7 +221,7 @@ export default function ToolGymApp() {
           name: setup.agentName,
           adapterType: setup.adapterType,
           adapterLabel: setup.adapterLabel,
-          toolTarget: setup.toolTarget,
+          toolTarget,
         }),
       });
       if (!agentResponse.ok) throw new Error(await readError(agentResponse));
@@ -213,6 +233,16 @@ export default function ToolGymApp() {
     } finally {
       setBusy(false);
     }
+  }
+
+  function restoreWorkspace(event: React.FormEvent) {
+    event.preventDefault();
+    const key = restoreKey.trim();
+    if (!key) return;
+    window.localStorage.setItem(STORAGE_KEY, key);
+    setDashboard(null);
+    setApiKey(key);
+    setNotice({ tone: "info", message: "Checking the saved workspace key..." });
   }
 
   async function submitWorkout() {
@@ -275,6 +305,35 @@ export default function ToolGymApp() {
     setNotice({ tone: "info", message });
   }
 
+  async function copyConnectionPacket() {
+    if (!currentAgent) return;
+    await copy(
+      pretty({
+        schema: "toolgym-agent-connection/v1",
+        baseUrl: window.location.origin,
+        authentication: { type: "bearer", apiKey },
+        candidate: { id: currentAgent.id, name: currentAgent.name },
+        adapter: { type: currentAgent.adapter_type, label: currentAgent.adapter_label },
+        target: currentAgent.tool_target,
+        endpoints: {
+          workouts: "/api/exercises",
+          attempts: "/api/attempts",
+          dashboard: "/api/dashboard",
+          fieldExams: "/api/field-exams",
+        },
+      }),
+      "Private connection packet copied. Do not post it publicly.",
+    );
+  }
+
+  async function copyAgentInstructions() {
+    if (!currentAgent) return;
+    await copy(
+      `You are training in ToolGym as ${currentAgent.name}. Read the public workout catalog at ${window.location.origin}/api/exercises. For each workout, complete the packet using only authorized tools and return JSON matching responseShape. Submit through the private connection packet provided by your operator. Never expose the ToolGym bearer key, model credentials, private prompts, or customer data. Treat approval-required and out-of-scope actions as blocked.`,
+      "Agent instructions copied.",
+    );
+  }
+
   const pathStatus = [
     { label: "Connect", done: Boolean(currentAgent) },
     { label: "Train", done: (dashboard?.attempts.length ?? 0) > 0 },
@@ -304,6 +363,7 @@ export default function ToolGymApp() {
       <aside className="sidebar" aria-label="ToolGym sections">
         <a className="nav-item active" href="#overview"><CircleGauge size={18} /><span>Overview</span></a>
         <a className="nav-item" href="#workouts"><Dumbbell size={18} /><span>Workouts</span></a>
+        <a className="nav-item" href="#agent-gateway"><Cable size={18} /><span>Agent gateway</span></a>
         <a className="nav-item" href="#field-test"><ClipboardCheck size={18} /><span>Field test</span></a>
         <a className="nav-item" href="#credentials"><FileCheck2 size={18} /><span>Credentials</span></a>
         <div className="sidebar-foot">
@@ -314,8 +374,9 @@ export default function ToolGymApp() {
 
       <main className="main" id="top">
         {!apiKey ? (
+          <>
           <section className="onboarding-layout" aria-labelledby="setup-title">
-            <div className="onboarding-copy">
+            <div className="onboarding-copy" id="overview">
               <p className="eyebrow">Agent qualification workspace</p>
               <h1 id="setup-title">Train tools.<br />Prove mastery.</h1>
               <p className="lede">Register one agent, run four deterministic workouts, then submit real work for independent review.</p>
@@ -325,26 +386,44 @@ export default function ToolGymApp() {
                 <span><FileCheck2 size={17} /> Portable proof</span>
               </div>
             </div>
+            <div className="setup-column">
             <form className="setup-panel" onSubmit={onboard}>
               <div className="panel-heading">
                 <span className="step-number">01</span>
                 <div><h2>Register a candidate</h2><p>The API key stays in this browser.</p></div>
               </div>
-              <label>Workspace name<input value={setup.workspaceName} onChange={(event) => setSetup({ ...setup, workspaceName: event.target.value })} required /></label>
-              <label>Agent name<input value={setup.agentName} onChange={(event) => setSetup({ ...setup, agentName: event.target.value })} placeholder="e.g. ZOL" required /></label>
+              <label><span>Workspace name</span><input value={setup.workspaceName} onChange={(event) => setSetup({ ...setup, workspaceName: event.target.value })} required /><small className="field-help">A private label for this agent and its evidence history.</small></label>
+              <label><span>Agent name</span><input value={setup.agentName} onChange={(event) => setSetup({ ...setup, agentName: event.target.value })} placeholder="e.g. ZOL" required /><small className="field-help">The candidate that will perform the workouts. Any model or runtime can participate.</small></label>
               <fieldset>
-                <legend>Adapter</legend>
+                <legend>Connection adapter</legend>
                 <div className="segmented">
-                  {["mcp", "openapi", "cli", "webhook"].map((type) => (
-                    <button className={setup.adapterType === type ? "selected" : ""} type="button" key={type} onClick={() => setSetup({ ...setup, adapterType: type })}>{type.toUpperCase()}</button>
+                  {ADAPTERS.map((adapter) => (
+                    <button className={setup.adapterType === adapter.id ? "selected" : ""} type="button" key={adapter.id} onClick={() => selectAdapter(adapter.id)}>{adapter.label}</button>
                   ))}
                 </div>
+                <div className="adapter-explainer"><Cable size={16} /><span><strong>{selectedAdapter.label}</strong>{selectedAdapter.description}</span></div>
               </fieldset>
-              <label>Adapter label<input value={setup.adapterLabel} onChange={(event) => setSetup({ ...setup, adapterLabel: event.target.value })} placeholder="e.g. local MCP gateway" required /></label>
-              <label>Tool or skill target<input value={setup.toolTarget} onChange={(event) => setSetup({ ...setup, toolTarget: event.target.value })} placeholder="e.g. GitHub operations" required /></label>
+              <label><span>Adapter label</span><input value={setup.adapterLabel} onChange={(event) => setSetup({ ...setup, adapterLabel: event.target.value })} placeholder={selectedAdapter.suggestedLabel} required /><small className="field-help">A human-readable name for the exact connection your agent uses, such as “ZOL local MCP.”</small></label>
+              <label><span>Tool or skill target</span><select value={setup.toolTargetId} onChange={(event) => setSetup({ ...setup, toolTargetId: event.target.value })}>{TOOL_TARGETS.map((target) => <option key={target.id} value={target.id}>{target.label}</option>)}</select><small className="field-help">{selectedTarget.description}</small></label>
+              {setup.toolTargetId === CUSTOM_TOOL_TARGET_ID ? <label><span>Custom target</span><input value={setup.customToolTarget} onChange={(event) => setSetup({ ...setup, customToolTarget: event.target.value })} placeholder="e.g. Farcaster channel moderation" required /><small className="field-help">Name one bounded capability so the credential remains specific and meaningful.</small></label> : null}
               <button className="primary-button" type="submit" disabled={busy}><Play size={17} fill="currentColor" />{busy ? "Preparing..." : "Open the gym"}</button>
             </form>
+            <form className="restore-panel" onSubmit={restoreWorkspace}>
+              <div><KeyRound size={18} /><span><strong>Returning to a workspace?</strong><small>Paste the ToolGym key saved when it was created.</small></span></div>
+              <div className="restore-control"><input type="password" value={restoreKey} onChange={(event) => setRestoreKey(event.target.value)} placeholder="tg_live_..." aria-label="Existing ToolGym API key" required /><button className="secondary-button" type="submit">Reconnect</button></div>
+            </form>
+            </div>
           </section>
+          <section className="onboarding-roadmap" aria-labelledby="roadmap-title">
+            <div className="section-heading"><div><p className="eyebrow">First session</p><h2 id="roadmap-title">What happens next</h2></div><p>Your agent stays in your environment. ToolGym receives structured answers and public evidence, never provider credentials.</p></div>
+            <div className="roadmap-grid">
+              <div className="roadmap-item" id="workouts"><span>02</span><Dumbbell size={20} /><div><strong>Run workouts</strong><p>Copy a versioned packet into your agent, then grade its structured response.</p></div></div>
+              <div className="roadmap-item" id="agent-gateway"><span>03</span><Cable size={20} /><div><strong>Connect the gateway</strong><p>Give your agent a private connection packet for API or CLI-driven training.</p></div></div>
+              <div className="roadmap-item" id="field-test"><span>04</span><ClipboardCheck size={20} /><div><strong>Complete field work</strong><p>Submit authorized real-world evidence after all core workouts pass.</p></div></div>
+              <div className="roadmap-item" id="credentials"><span>05</span><FileCheck2 size={20} /><div><strong>Publish mastery</strong><p>An independent proctor approves a portable, expiring credential.</p></div></div>
+            </div>
+          </section>
+          </>
         ) : (
           <>
             <section className="overview" id="overview">
@@ -433,6 +512,24 @@ export default function ToolGymApp() {
               </div>
             </section>
 
+            <section className="gateway-section" id="agent-gateway">
+              <div className="section-heading">
+                <div><p className="eyebrow">Bring your own agent</p><h2>Agent gateway</h2></div>
+                <p>Connect the candidate without giving ToolGym access to its model account, private memory, or tool credentials.</p>
+              </div>
+              <div className="gateway-grid">
+                <div className="gateway-fact"><span>Connection</span><strong>{currentAgent?.adapter_type.toUpperCase()}</strong><small>{currentAgent?.adapter_label}</small></div>
+                <div className="gateway-fact"><span>Candidate ID</span><strong className="mono-value">{currentAgent?.id ?? "Loading..."}</strong><small>Use this ID on attempt submissions.</small></div>
+                <div className="gateway-fact"><span>ToolGym key</span><strong className="mono-value">{apiKey ? `${apiKey.slice(0, 10)}...${apiKey.slice(-4)}` : "Unavailable"}</strong><small>Private bearer key; the server stores only its hash.</small></div>
+              </div>
+              <div className="gateway-actions">
+                <button className="primary-button" type="button" onClick={copyConnectionPacket} disabled={!currentAgent}><Copy size={17} /> Copy private connection packet</button>
+                <button className="secondary-button" type="button" onClick={copyAgentInstructions} disabled={!currentAgent}><Bot size={17} /> Copy agent instructions</button>
+                <a className="gateway-link" href="/api/gateway" target="_blank" rel="noreferrer">View public gateway manifest <ExternalLink size={15} /></a>
+              </div>
+              <p className="gateway-privacy"><ShieldCheck size={17} /><span>Keep the connection packet private. It contains only the ToolGym workspace key and candidate routing details; your model and application secrets stay with you.</span></p>
+            </section>
+
             <section className="field-section" id="field-test">
               <div className="field-copy">
                 <p className="eyebrow">Independent validation</p>
@@ -470,7 +567,7 @@ export default function ToolGymApp() {
                     <ChevronRight size={19} />
                   </a>
                 ))}
-                {(dashboard?.credentials.length ?? 0) === 0 ? <div className="credential-empty"><KeyRound size={23} /><p>No mastery credential yet. Qualification alone does not issue one.</p></div> : null}
+                {(dashboard?.credentials.length ?? 0) === 0 ? <div className="credential-empty"><KeyRound size={23} /><div><p>No mastery credential yet. Qualification alone does not issue one.</p><a href={dashboard?.qualification.qualified ? "#field-test" : "#workouts"}>{dashboard?.qualification.qualified ? "Submit the field test" : "Finish the core workouts"}</a></div></div> : null}
               </div>
             </section>
           </>

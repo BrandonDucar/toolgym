@@ -34,7 +34,8 @@ body {
 
 button,
 input,
-textarea {
+textarea,
+select {
   font: inherit;
 }
 
@@ -46,7 +47,8 @@ a {
 button:focus-visible,
 a:focus-visible,
 input:focus-visible,
-textarea:focus-visible {
+textarea:focus-visible,
+select:focus-visible {
   outline: 3px solid rgba(47, 111, 237, 0.35);
   outline-offset: 2px;
 }
@@ -223,6 +225,11 @@ h3 {
   margin: 0 auto;
 }
 
+.setup-column {
+  display: grid;
+  gap: 12px;
+}
+
 .onboarding-copy h1 {
   max-width: 660px;
   font-size: 72px;
@@ -303,8 +310,16 @@ label {
   margin-bottom: 16px;
 }
 
+.field-help {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
 input,
-textarea {
+textarea,
+select {
   width: 100%;
   color: var(--ink);
   background: #fff;
@@ -317,6 +332,11 @@ input {
   padding: 0 12px;
 }
 
+select {
+  height: 43px;
+  padding: 0 36px 0 12px;
+}
+
 textarea {
   min-height: 110px;
   padding: 11px 12px;
@@ -325,7 +345,8 @@ textarea {
 }
 
 input:disabled,
-textarea:disabled {
+textarea:disabled,
+select:disabled {
   color: #8a9296;
   background: #e7e5de;
 }
@@ -363,6 +384,119 @@ legend {
 .segmented button.selected {
   color: #fff;
   background: var(--navy);
+}
+
+.adapter-explainer {
+  display: grid;
+  grid-template-columns: 20px 1fr;
+  gap: 8px;
+  align-items: start;
+  margin-top: 8px;
+  padding: 10px 11px;
+  color: #43545d;
+  background: #eef2ee;
+  border-left: 3px solid var(--aqua);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.adapter-explainer strong,
+.adapter-explainer span {
+  display: block;
+}
+
+.adapter-explainer strong {
+  margin-bottom: 2px;
+  color: var(--ink);
+}
+
+.restore-panel {
+  display: grid;
+  gap: 10px;
+  padding: 15px;
+  background: #e8e5dc;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+
+.restore-panel > div:first-child {
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  gap: 8px;
+  align-items: center;
+}
+
+.restore-panel strong,
+.restore-panel small {
+  display: block;
+}
+
+.restore-panel strong {
+  margin-bottom: 3px;
+  font-size: 12px;
+}
+
+.restore-panel small {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.restore-control {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 7px;
+}
+
+.onboarding-roadmap {
+  max-width: 1120px;
+  margin: 70px auto 0;
+  scroll-margin-top: 130px;
+}
+
+.roadmap-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  border-top: 1px solid var(--line-dark);
+  border-bottom: 1px solid var(--line-dark);
+}
+
+.roadmap-item {
+  min-height: 154px;
+  display: grid;
+  grid-template-columns: 32px 24px 1fr;
+  gap: 9px;
+  align-content: start;
+  padding: 19px 16px;
+  scroll-margin-top: 130px;
+  border-right: 1px solid var(--line);
+}
+
+.roadmap-item:last-child {
+  border-right: 0;
+}
+
+.roadmap-item > span {
+  color: var(--blue);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.roadmap-item > svg {
+  color: var(--navy);
+}
+
+.roadmap-item strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+}
+
+.roadmap-item p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
 }
 
 .primary-button,
@@ -544,9 +678,105 @@ legend {
 }
 
 .workout-section,
-.credentials-section {
+.credentials-section,
+.gateway-section {
   max-width: 1320px;
   margin: 0 auto 52px;
+  scroll-margin-top: 130px;
+}
+
+.gateway-section {
+  padding: 26px;
+  background: #e8e5dc;
+  border-top: 6px solid var(--aqua);
+  border-bottom: 1px solid var(--line-dark);
+}
+
+.gateway-grid {
+  display: grid;
+  grid-template-columns: 0.8fr 1.25fr 1fr;
+  border-top: 1px solid var(--line-dark);
+  border-bottom: 1px solid var(--line-dark);
+}
+
+.gateway-fact {
+  min-width: 0;
+  min-height: 112px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 15px;
+  border-right: 1px solid var(--line);
+}
+
+.gateway-fact:last-child {
+  border-right: 0;
+}
+
+.gateway-fact span,
+.gateway-fact small,
+.gateway-fact strong {
+  display: block;
+}
+
+.gateway-fact span {
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.gateway-fact strong {
+  margin-bottom: 6px;
+  font-size: 17px;
+  overflow-wrap: anywhere;
+}
+
+.gateway-fact small {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.mono-value {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 12px !important;
+}
+
+.gateway-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  align-items: center;
+  margin-top: 16px;
+}
+
+.gateway-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 0 4px;
+  color: var(--blue);
+  font-size: 12px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.gateway-privacy {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 15px 0 0;
+  color: #46575e;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.gateway-privacy svg {
+  min-width: 17px;
+  color: #17796f;
 }
 
 .section-heading {
@@ -859,6 +1089,7 @@ pre {
   color: #fff;
   border: 1px solid #0b1d28;
   border-radius: 7px;
+  scroll-margin-top: 130px;
 }
 
 .field-copy p:not(.eyebrow) {
@@ -1012,6 +1243,14 @@ pre {
 .credential-empty p {
   margin: 0;
   font-size: 13px;
+}
+
+.credential-empty a {
+  display: inline-block;
+  margin-top: 7px;
+  color: var(--blue);
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .toast {
@@ -1230,6 +1469,18 @@ pre {
     grid-column: 1 / -1;
     min-height: 120px;
   }
+
+  .roadmap-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .roadmap-item:nth-child(2) {
+    border-right: 0;
+  }
+
+  .roadmap-item:nth-child(-n + 2) {
+    border-bottom: 1px solid var(--line);
+  }
 }
 
 @media (max-width: 860px) {
@@ -1272,6 +1523,20 @@ pre {
   .onboarding-layout {
     grid-template-columns: 1fr;
     gap: 30px;
+  }
+
+  .gateway-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .gateway-fact {
+    min-height: 92px;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .gateway-fact:last-child {
+    border-bottom: 0;
   }
 
   .onboarding-copy h1 {
@@ -1340,6 +1605,29 @@ pre {
 
   .segmented {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .restore-control,
+  .roadmap-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .roadmap-item,
+  .roadmap-item:nth-child(2) {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .roadmap-item:last-child {
+    border-bottom: 0;
+  }
+
+  .gateway-section {
+    padding: 18px;
+  }
+
+  .gateway-actions > * {
+    width: 100%;
   }
 
   .workout-grid {

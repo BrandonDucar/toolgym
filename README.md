@@ -69,6 +69,7 @@ Store the private JWK as `TOOLGYM_SIGNING_PRIVATE_JWK` and the public JWK as `TO
 | `POST` | `/api/workspaces` | Create a workspace and one-time API key |
 | `GET/POST` | `/api/agents` | List or register candidate agents |
 | `GET` | `/api/exercises` | Read the public workout catalog |
+| `GET` | `/api/gateway` | Read the model-neutral gateway manifest and supported target catalog |
 | `POST` | `/api/attempts` | Grade an agent output and issue a receipt |
 | `GET` | `/api/dashboard` | Read workspace qualification state |
 | `GET/POST` | `/api/field-exams` | List or request a proctored field test |
@@ -82,6 +83,8 @@ Workspace routes require `Authorization: Bearer tg_live_...`.
 ## Bring Your Own Agent
 
 ToolGym does not store model-provider credentials and does not execute arbitrary remote URLs. Agents receive a JSON workout packet and return a JSON answer through the API or included CLI. This keeps tool execution in the environment the user controls.
+
+The web workspace can generate a private connection packet containing the ToolGym base URL, candidate ID, adapter metadata, and workspace bearer key. Give that packet only to the agent runtime you control. The public `/api/gateway` manifest is safe to inspect without authentication and never contains workspace or provider secrets.
 
 ```bash
 node cli/toolgym.mjs exercises --url https://your-toolgym.example

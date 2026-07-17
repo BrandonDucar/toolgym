@@ -78,8 +78,23 @@ test("server-renders the ToolGym application shell", async () => {
   assert.match(html, /<title>ToolGym \| Agent tool training and proof<\/title>/i);
   assert.match(html, /Train tools/);
   assert.match(html, /Register a candidate/);
+  assert.match(html, /What happens next/);
+  assert.match(html, /Agent gateway/);
+  assert.match(html, /Returning to a workspace/);
+  assert.match(html, /GitHub operations/);
   assert.match(html, /ToolGym/);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape|react-loading-skeleton/i);
+});
+
+test("publishes a model-neutral agent gateway manifest", async () => {
+  const response = await fetch(`${origin}/api/gateway`);
+  assert.equal(response.status, 200);
+  const manifest = await response.json();
+  assert.equal(manifest.version, "1.0.0");
+  assert.equal(manifest.authentication.type, "bearer");
+  assert.match(manifest.authentication.providerCredentials, /does not request or store/i);
+  assert.ok(manifest.adapters.some((adapter) => adapter.id === "mcp"));
+  assert.ok(manifest.toolTargets.some((target) => target.id === "custom-skill"));
 });
 
 test("server-renders public verification routes without starter content", async () => {

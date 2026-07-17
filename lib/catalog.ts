@@ -42,7 +42,7 @@ export const EXERCISES: ExerciseDefinition[] = [
   },
   {
     id: "argument-discipline",
-    version: "1.1.0",
+    version: "1.0.0",
     title: "Argument Discipline",
     lane: "execution",
     difficulty: 2,
@@ -138,7 +138,7 @@ export const EXERCISES: ExerciseDefinition[] = [
   },
   {
     id: "recovery-routing",
-    version: "1.0.0",
+    version: "1.1.0",
     title: "Recovery Routing",
     lane: "recovery",
     difficulty: 3,

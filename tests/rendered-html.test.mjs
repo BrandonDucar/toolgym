@@ -238,6 +238,12 @@ test("runs the complete workout, field-test, and credential lifecycle", async ()
   assert.equal(labReceipt.result.passed, true);
   assert.equal("response" in labReceipt, false);
 
+  const postLabDashboardResponse = await fetch(`${origin}/api/dashboard`, { headers: authenticated });
+  assert.equal(postLabDashboardResponse.status, 200);
+  const postLabDashboard = await postLabDashboardResponse.json();
+  assert.equal(postLabDashboard.labAttempts.length, 1);
+  assert.equal("response_json" in postLabDashboard.labAttempts[0], false);
+
   const fieldTestResponse = await fetch(`${origin}/api/field-exams`, {
     method: "POST",
     headers: authenticated,

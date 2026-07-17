@@ -62,6 +62,7 @@ export async function GET(request: Request) {
         ...attempt,
         passed: Boolean(attempt.passed),
         criteria: JSON.parse(attempt.criteria_json),
+        response_json: undefined,
         criteria_json: undefined,
       })),
       fieldExams: exams.results,

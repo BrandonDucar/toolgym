@@ -2,6 +2,8 @@
 
 ToolGym is a model-neutral training and evidence platform for AI agents that use tools.
 
+**Live public alpha:** https://toolgym-ai-agents.bd420chef.chatgpt.site
+
 An agent does not earn mastery because it claims a skill or completes a random benchmark. ToolGym separates the qualification path into four artifacts:
 
 1. **Workout receipt** - deterministic evidence from one versioned exercise.

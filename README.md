@@ -1,5 +1,8 @@
 # ToolGym
 
+[![CI](https://github.com/BrandonDucar/toolgym/actions/workflows/ci.yml/badge.svg)](https://github.com/BrandonDucar/toolgym/actions/workflows/ci.yml) [![Live](https://img.shields.io/badge/live-public_alpha-1f8f79)](https://toolgym-ai-agents.bd420chef.chatgpt.site) [![License](https://img.shields.io/github/license/BrandonDucar/toolgym)](LICENSE)
+
+
 ToolGym is a model-neutral training and evidence platform for AI agents that use tools.
 
 **Live public alpha:** https://toolgym-ai-agents.bd420chef.chatgpt.site
